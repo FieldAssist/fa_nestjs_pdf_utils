@@ -1,0 +1,14 @@
+.idea/
+.vscode/
+.husky/
+
+tmp/
+
+dist/
+node_modules/
+coverage/
+/src/db/clients/main/migration/
+.nyc_output
+
+
+tests_old/

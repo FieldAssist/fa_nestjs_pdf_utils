@@ -1,0 +1,15 @@
+.idea/
+.vscode/
+node_modules/
+build/
+tmp/
+temp/
+client-dist/
+dist/
+coverage/
+
+.husky/
+templates/
+.nyc_output
+
+tests_old/
