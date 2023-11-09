@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import fs from 'fs';
 import pdf from 'pdf-parse';
+import { renderPage } from './utils/pdf';
 
 export type Page = { index: number; lines: string[] };
 
@@ -28,7 +29,12 @@ export class AppService {
 
     // const dataBuffer = fs.readFileSync(filepath);
     const dataBuffer = file.buffer;
-    const data = await pdf(dataBuffer);
+
+    let options = {
+      pagerender: renderPage,
+    };
+
+    const data = await pdf(dataBuffer, options);
     // number of pages
     // console.log(data.numpages);
     // // number of rendered pages
@@ -58,7 +64,10 @@ export class AppService {
     const firstPage = pages[0];
 
     // Vendor Details
-    const vendorDetails = this.extractSellerDetails(firstPage);
+    const buyerDetails = this.extractBuyerDetails(firstPage);
+    const poDetails = this.extractPoDetails(firstPage);
+    const buyerBillingAddress = this.extractBuyerBillingAddress(firstPage);
+    const orderItems = this.extractLineItem(firstPage);
 
     return { success: true };
   }
@@ -79,8 +88,8 @@ export class AppService {
     return newPages;
   }
 
-  private extractSellerDetails(firstPage: Page) {
-    const sellerDetails = {
+  private extractBuyerDetails(firstPage: Page) {
+    const details = {
       name: '',
       address: '',
       postalCode: '',
@@ -98,20 +107,20 @@ export class AppService {
       }
     }
 
-    sellerDetails.name = lines[1].trim();
+    details.name = lines[1].trim();
 
     for (const line of lines) {
       if (line.includes('Postal Code:')) {
-        sellerDetails.postalCode = line.split('Postal Code:')[1].trim();
+        details.postalCode = line.split('Postal Code:')[1].trim();
       }
       if (line.includes('GSTIN:')) {
-        sellerDetails.gstin = line.split('GSTIN:')[1].trim();
+        details.gstin = line.split('GSTIN:')[1].trim();
       }
       if (line.includes('PAN:')) {
-        sellerDetails.pan = line.split('PAN:')[1].trim();
+        details.pan = line.split('PAN:')[1].trim();
       }
       if (line.includes('Contact:')) {
-        sellerDetails.mobile = line.split('Contact:')[1].trim();
+        details.mobile = line.split('Contact:')[1].trim();
       }
     }
 
@@ -123,8 +132,123 @@ export class AppService {
       }
     }
     addressLines.shift();
-    sellerDetails.address = addressLines.join(' ').trim();
+    details.address = addressLines.join(' ').trim();
 
-    return sellerDetails;
+    return details;
+  }
+
+  private extractPoDetails(firstPage: Page) {
+    const details = {
+      poNo: '',
+      poCreationDate: '',
+    };
+
+    const startIndex = firstPage.lines.findIndex((value) =>
+      value.includes('PO No'),
+    );
+    details.poNo = firstPage.lines[startIndex + 1].trim();
+    details.poCreationDate = firstPage.lines[startIndex + 3].trim();
+
+    return details;
+  }
+
+  private extractBuyerBillingAddress(firstPage: Page) {
+    const details = {
+      firmName: '',
+      address: '',
+      gstin: '',
+      pan: '',
+      mobile: '',
+    };
+
+    // extract relevant lines
+    const startIndex = firstPage.lines.findIndex((value) =>
+      value.includes('Billing AddressShipping Address'),
+    );
+    let lines = firstPage.lines.slice(startIndex + 1);
+    const endLineIndex = lines.findIndex((value) => value.includes('Contact'));
+    lines = lines.slice(0, endLineIndex + 1);
+
+    details.firmName = lines[0].trim();
+
+    for (const line of lines) {
+      if (line.includes('GSTIN:')) {
+        details.gstin = line.split('GSTIN:')[1].trim();
+      }
+      if (line.includes('PAN:')) {
+        details.pan = line.split('PAN:')[1].trim();
+      }
+      if (line.includes('Contact:')) {
+        details.mobile = line.split('Contact:')[1].trim();
+      }
+    }
+
+    // address
+    const endAddressLineIndex = lines.findIndex((value) =>
+      value.includes('GSTIN:'),
+    );
+    const addressLines = lines.slice(1, endAddressLineIndex);
+    details.address = addressLines.join(' ').trim();
+
+    return details;
+  }
+
+  private extractBuyerShippingAddress(firstPage: Page) {
+    const details = {
+      firmName: '',
+      address: '',
+      gstin: '',
+      pan: '',
+      mobile: '',
+    };
+
+    // extract relevant lines
+    let startIndex = firstPage.lines.findIndex((value) =>
+      value.includes('Billing AddressShipping Address'),
+    );
+    let lines = firstPage.lines.slice(startIndex + 1);
+    startIndex = lines.findIndex((value) => value.includes('Contact'));
+    const endLineIndex = lines.findIndex((value) => value.includes('Contact'));
+    lines = lines.slice(startIndex + 1, endLineIndex + 1);
+
+    details.firmName = lines[0].trim();
+
+    for (const line of lines) {
+      if (line.includes('GSTIN:')) {
+        details.gstin = line.split('GSTIN:')[1].trim();
+      }
+      if (line.includes('PAN:')) {
+        details.pan = line.split('PAN:')[1].trim();
+      }
+      if (line.includes('Contact:')) {
+        details.mobile = line.split('Contact:')[1].trim();
+      }
+    }
+
+    // address
+    const endAddressLineIndex = lines.findIndex((value) =>
+      value.includes('GSTIN:'),
+    );
+    const addressLines = lines.slice(1, endAddressLineIndex);
+    details.address = addressLines.join(' ').trim();
+
+    return details;
+  }
+
+  private extractLineItem(firstPage: Page) {
+    const startIndex = firstPage.lines.findIndex((value) =>
+      value.includes('Total(INR)'),
+    );
+    const endIndex = firstPage.lines.findIndex((value) =>
+      value.includes('Total Amount (INR)'),
+    );
+    const lines = firstPage.lines.slice(startIndex + 1, endIndex + 1);
+
+    const rawItems: { serialNo: number; data: any }[] = [];
+    for (let i = 0; i < 30; i++) {
+      const line = lines[i];
+      if (line.trim().includes(`${i + 1}`)) {
+      }
+    }
   }
 }
